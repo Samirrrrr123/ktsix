@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>КТ №6 - AJAX, WebSockets, SSE</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .block {
+            background: white;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        input[type="text"] {
+            padding: 8px;
+            width: 300px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        select {
+            padding: 8px;
+            margin: 5px;
+        }
+        .data-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            background: #e3f2fd;
+            border-radius: 4px;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 5px 10px;
+            background: #e8f5e8;
+            border-radius: 3px;
+            display: inline-block;
+            margin: 5px;
+        }
+        .controls {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>КТ №6 - AJAX, WebSockets, Server-Sent Events</h1>
+
+    <!-- Раздел 1: Fake API через Fetch -->
+    <div class="block">
+        <h2>1. Fetch API (JSONPlaceholder)</h2>
+        <div class="controls">
+            <select id="dataType">
+                <option value="posts">Посты</option>
+                <option value="users">Пользователи</option>
+                <option value="comments">Комментарии</option>
+                <option value="albums">Альбомы</option>
+            </select>
+            <button onclick="loadFakeData()">Загрузить данные</button>
+            <button onclick="clearFakeData()">Очистить</button>
+            <span id="apiStatus" class="status">Готов</span>
+        </div>
+        <div id="fakeData" class="data-box">Данные появятся здесь...</div>
+    </div>
+
+    <!-- Раздел 2: WebSockets чат -->
+    <div class="block">
+        <h2>2. WebSockets чат (Socket.IO)</h2>
+        <div class="controls">
+            <input type="text" id="username" placeholder="Ваше имя" value="Аноним">
+            <input type="text" id="messageInput" placeholder="Сообщение">
+            <button onclick="sendMessage()">Отправить</button>
+            <button onclick="connectWebSocket()">Подключиться</button>
+            <button onclick="disconnectWebSocket()">Отключиться</button>
+            <span id="wsStatus" class="status">Не подключен</span>
+        </div>
+        <div id="chatMessages" class="data-box">
+            <div>Сообщения чата появятся здесь...</div>
+        </div>
+    </div>
+
+    <!-- Раздел 3: Server-Sent Events -->
+    <div class="block">
+        <h2>3. Server-Sent Events (SSE)</h2>
+        <div class="controls">
+            <button onclick="connectSSE()">Подключиться к SSE</button>
+            <button onclick="disconnectSSE()">Отключиться</button>
+            <button onclick="simulateNewPost()">Симулировать новый пост</button>
+            <span id="sseStatus" class="status">Не подключен</span>
+        </div>
+        <div id="sseData" class="data-box">
+            <div>Обновления появятся здесь...</div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Fake API через Fetch
+        async function loadFakeData() {
+            const type = document.getElementById('dataType').value;
+            const url = `https://jsonplaceholder.typicode.com/${type}`;
+            const statusEl = document.getElementById('apiStatus');
+            const outputEl = document.getElementById('fakeData');
+            
+            statusEl.textContent = 'Загрузка...';
+            statusEl.style.background = '#fff3cd';
+            
+            try {
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                let html = `<h3>${type.toUpperCase()} (найдено: ${data.length})</h3>`;
+                data.slice(0, 10).forEach(item => {
+                    html += `<div class="message">`;
+                    if (item.title) html += `<strong>${item.title}</strong><br>`;
+                    if (item.name) html += `<strong>${item.name}</strong><br>`;
+                    if (item.body) html += `${item.body.substring(0, 100)}...<br>`;
+                    if (item.email) html += `<small>${item.email}</small>`;
+                    html += `</div>`;
+                });
+                
+                outputEl.innerHTML = html;
+                statusEl.textContent = 'Успешно загружено';
+                statusEl.style.background = '#d4edda';
+                
+            } catch (error) {
+                outputEl.innerHTML = `<div class="error">Ошибка: ${error.message}<br>Проверьте соединение или попробуйте позже</div>`;
+                statusEl.textContent = 'Ошибка';
+                statusEl.style.background = '#f8d7da';
+            }
+        }
+        
+        function clearFakeData() {
+            document.getElementById('fakeData').innerHTML = 'Данные очищены';
+        }
+
+        // 2. WebSockets
+        let socket = null;
+        let messageCounter = 0;
+        
+        function connectWebSocket() {
+            const statusEl = document.getElementById('wsStatus');
+            const chatEl = document.getElementById('chatMessages');
+            
+            try {
+                socket = new WebSocket('wss://javascript.info/article/websocket/demo/hello');
+                
+                socket.onopen = function(e) {
+                    statusEl.textContent = 'Подключен';
+                    statusEl.style.background = '#d4edda';
+                    addChatMessage('system', 'Соединение установлено');
+                };
+                
+                socket.onmessage = function(event) {
+                    addChatMessage('server', event.data);
+                };
+                
+                socket.onclose = function(event) {
+                    statusEl.textContent = 'Отключен';
+                    statusEl.style.background = '#f8d7da';
+                    if (!event.wasClean) {
+                        addChatMessage('system', `Соединение прервано (код: ${event.code})`);
+                    }
+                };
+                
+                socket.onerror = function(error) {
+                    addChatMessage('system', `Ошибка WebSocket`);
+                    statusEl.textContent = 'Ошибка';
+                    statusEl.style.background = '#f8d7da';
+                };
+                
+            } catch (error) {
+                chatEl.innerHTML += `<div class="error">Не удалось подключиться: ${error}</div>`;
+            }
+        }
+        
+        function sendMessage() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                alert('Сначала подключитесь к WebSocket');
+                return;
+            }
+            
+            const message = document.getElementById('messageInput').value;
+            const username = document.getElementById('username').value || 'Аноним';
+            
+            if (!message.trim()) {
+                alert('Введите сообщение');
+                return;
+            }
+            
+            const fullMessage = `${username}: ${message}`;
+            socket.send(fullMessage);
+            addChatMessage('me', fullMessage);
+            document.getElementById('messageInput').value = '';
+        }
+        
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
+        
+        function addChatMessage(type, text) {
+            const chatEl = document.getElementById('chatMessages');
+            const messageId = ++messageCounter;
+            
+            let bgColor = '#e3f2fd';
+            let prefix = '';
+            
+            if (type === 'me') {
+                bgColor = '#d4edda';
+                prefix = 'Вы: ';
+            } else if (type === 'server') {
+                bgColor = '#fff3cd';
+                prefix = 'Сервер: ';
+            } else if (type === 'system') {
+                bgColor = '#f0f0f0';
+                prefix = 'Система: ';
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.style.background = bgColor;
+            messageDiv.innerHTML = `<strong>${prefix}</strong>${text} <small>#${messageId}</small>`;
+            
+            chatEl.appendChild(messageDiv);
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        // 3. Server-Sent Events
+        let eventSource = null;
+        let sseCounter = 0;
+        
+        function connectSSE() {
+            const statusEl = document.getElementById('sseStatus');
+            const outputEl = document.getElementById('sseData');
+            
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            outputEl.innerHTML = '<div>Подключение к SSE...</div>';
+            
+            try {
+                eventSource = new EventSource('https://sse.demo/server-events');
+                
+                eventSource.onopen = function() {
+                    statusEl.textContent = 'Подключен';
+                    statusEl.style.background = '#d4edda';
+                    addSSEMessage('Соединение с SSE установлено');
+                };
+                
+                eventSource.onmessage = function(event) {
+                    sseCounter++;
+                    const data = event.data || 'Нет данных';
+                    addSSEMessage(`Сообщение ${sseCounter}: ${data}`);
+                };
+                
+                eventSource.addEventListener('newpost', function(event) {
+                    try {
+                        const post = JSON.parse(event.data);
+                        addSSEMessage(`📢 НОВЫЙ ПОСТ: ${post.title}`);
+                    } catch (e) {
+                        addSSEMessage(`Новый пост: ${event.data}`);
+                    }
+                });
+                
+                eventSource.addEventListener('update', function(event) {
+                    addSSEMessage(`🔄 Обновление: ${event.data}`);
+                });
+                
+                eventSource.onerror = function(error) {
+                    statusEl.textContent = 'Ошибка';
+                    statusEl.style.background = '#f8d7da';
+                    addSSEMessage(`Ошибка SSE. Возможно, эндпоинт недоступен`);
+                };
+                
+            } catch (error) {
+                outputEl.innerHTML += `<div class="error">Ошибка создания SSE соединения</div>`;
+            }
+        }
+        
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                document.getElementById('sseStatus').textContent = 'Отключен';
+                document.getElementById('sseStatus').style.background = '#f8d7da';
+                addSSEMessage('Соединение SSE закрыто');
+            }
+        }
+        
+        function addSSEMessage(text) {
+            const outputEl = document.getElementById('sseData');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+            msgDiv.textContent = `${new Date().toLocaleTimeString()}: ${text}`;
+            outputEl.appendChild(msgDiv);
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+        
+        function simulateNewPost() {
+            if (!eventSource || eventSource.readyState !== EventSource.OPEN) {
+                alert('Сначала подключитесь к SSE');
+                return;
+            }
+            
+            const posts = [
+                'Новость: Сегодня отличная погода!',
+                'Важное объявление: Экзамен перенесен',
+                'Новый урок: Изучаем WebSockets',
+                'Обновление системы: Добавлен чат',
+                'Напоминание: Сдать работу до пятницы'
+            ];
+            
+            const randomPost = posts[Math.floor(Math.random() * posts.length)];
+            
+            if (eventSource) {
+                const fakeEvent = new MessageEvent('newpost', {
+                    data: JSON.stringify({
+                        id: Date.now(),
+                        title: randomPost,
+                        author: 'Система',
+                        time: new Date().toLocaleTimeString()
+                    })
+                });
+                
+                eventSource.dispatchEvent(fakeEvent);
+            }
+        }
+
+        // Инициализация
+        window.onload = function() {
+            loadFakeData();
+        };
+    </script>
+</body>
+</html>
